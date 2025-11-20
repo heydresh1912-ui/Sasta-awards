@@ -1,0 +1,10 @@
+{
+  "name": "oscars-data-fetcher",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "jsdom": "^22.1.0",
+    "node-fetch": "^3.4.1"
+  }
+} 
