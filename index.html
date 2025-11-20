@@ -146,8 +146,7 @@ for (let y = YEAR_END; y >= YEAR_START; y--) {
   yearListEl.appendChild(div);
 }
 
-/* ------------------ SELECT YEAR ------------------- */
-// Robust selectYear with better error messages and fallback
+// selectYear using AllOrigins proxy to avoid CORS/HTML error
 async function selectYear(year, btn) {
   document.querySelectorAll(".year-item").forEach(x => x.classList.remove("active"));
   if (btn) btn.classList.add("active");
@@ -158,49 +157,45 @@ async function selectYear(year, btn) {
   try {
     const ceremonyNum = year - 1928;
     const pageTitle = `${ordinal(ceremonyNum)}_Academy_Awards`;
-    const pageEncoded = encodeURIComponent(pageTitle);
+    // Build the MediaWiki API URL (we will pass it to the CORS proxy)
+    const apiUrl = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageTitle)}&prop=text&format=json&formatversion=2`;
 
-    // Primary URL (explicit JSON)
-    let url = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageEncoded}&prop=text&format=json&formatversion=2&origin=*`;
+    // AllOrigins proxy (returns the raw response and adds CORS headers)
+    const proxy = "https://api.allorigins.win/raw?url=";
+    const proxied = proxy + encodeURIComponent(apiUrl);
 
-    let res = await fetch(url);
-    if (!res.ok) {
-      // Try a second, more permissive URL (older format/version)
-      url = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageEncoded}&prop=text&format=json&origin=*`;
-      res = await fetch(url);
+    const res = await fetch(proxied);
+    if (!res.ok) throw new Error("Network error from proxy");
+
+    // The proxy returns the *raw* JSON string from MediaWiki (or an HTML error)
+    const text = await res.text();
+
+    // Try to parse JSON safely; if it's HTML or invalid JSON we'll show it
+    let j;
+    try {
+      j = JSON.parse(text);
+    } catch (e) {
+      throw new Error("Server returned non-JSON response (first chars): " + text.slice(0,200));
     }
 
-    // If server returned an HTML page due to redirect or error, show it for debugging
-    const ct = res.headers.get("content-type") || "";
-    if (!ct.includes("application/json") && !ct.includes("text/json")) {
-      // read text so we can show what came back (HTML error page etc.)
-      const txt = await res.text();
-      throw new Error("Server returned non-JSON response. First bytes: " + txt.slice(0, 200));
-    }
-
-    const j = await res.json();
     if (j.error) throw new Error(j.error.info || JSON.stringify(j.error));
 
-    // parse returned html fragment
     const html = j.parse && (j.parse.text || j.parse.text['*']) ? (j.parse.text['*'] || j.parse.text) : null;
-    if (!html) throw new Error("No HTML content in API response");
+    if (!html) throw new Error("No HTML content returned from API");
 
     const data = extractWinners(html);
     data._meta = { year, page: pageTitle, fetchedAt: new Date().toISOString() };
 
-    // show results
+    // render
     statusEl.textContent = `Loaded — ${year}`;
     render(data);
 
   } catch (err) {
-    // show more helpful debug info in the UI
     statusEl.textContent = `Error loading ${year}: ${err.message}`;
-    resultsEl.innerHTML = `<pre style="color:#f88; max-height:60vh; overflow:auto;">${escapeHtml(String(err.stack || err.message))}</pre>`;
-    console.error("selectYear error:", err);
+    resultsEl.innerHTML = `<pre style="color:#f88">${escapeHtml(String(err.message))}</pre>`;
+    console.error(err);
   }
 }
-
-/* ------------------ PARSER ------------------- */
 function extractWinners(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
