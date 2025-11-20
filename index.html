@@ -1,291 +1,271 @@
-<!DOCTYPE html>
+              <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Oscars — Nominations (2000–2025)</title>
+
   <style>
     :root {
       --bg: #0f172a;
       --card: #0b1220;
-      --muted: #9aa7c7;
-      --accent: #facc15;
+      --muted: #9aa0b7;
+      --accent: #1e81ff;
+      --radius: 10px;
     }
+
     body {
-      font-family: Inter, ui-sans-serif, system-ui;
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
       background: var(--bg);
       color: white;
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
     }
+
     header {
-      padding: 20px 24px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      padding: 24px;
+      font-size: 24px;
+      border-bottom: 1px solid #1c263b;
     }
-    h1 {
-      margin: 0;
-      font-size: 22px;
-      font-weight: 600;
-    }
+
     main {
-      flex: 1;
       display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 16px;
+      grid-template-columns: 250px 1fr 250px;
+      gap: 20px;
       padding: 20px;
     }
+
     aside {
       background: var(--card);
-      border-radius: 12px;
-      padding: 12px;
+      padding: 16px;
+      border-radius: var(--radius);
+      height: calc(100vh - 120px);
       overflow-y: auto;
-      max-height: 80vh;
     }
+
     .year-item {
-      padding: 6px 8px;
-      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 6px;
+      background: #131b2d;
+      border-radius: var(--radius);
       cursor: pointer;
-      color: var(--muted);
     }
-    .year-item:hover {
-      background: rgba(255,255,255,0.1);
-      color: white;
-    }
+
     .year-item.active {
       background: var(--accent);
-      color: black;
-      font-weight: bold;
     }
-    section {
+
+    #results {
       background: var(--card);
       padding: 16px;
-      border-radius: 12px;
+      border-radius: var(--radius);
       overflow-y: auto;
-      max-height: 80vh;
+      height: calc(100vh - 120px);
     }
-    h2 {
-      color: var(--accent);
+
+    .category {
+      margin-bottom: 22px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #1c263b;
+    }
+
+    .cat-title {
       font-size: 18px;
+      margin-bottom: 10px;
     }
+
     .nominee {
-      margin-left: 10px;
-      font-size: 14px;
-    }
-    .winner {
-      font-weight: bold;
-      color: #fbbf24;
-    }
-    .status {
-      margin-top: 4px;
+      margin: 4px 0;
       color: var(--muted);
-      font-size: 12px;
+    }
+
+    .winner {
+      color: #ffd700;
+      font-weight: bold;
+    }
+
+    #search {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      border: 1px solid #1c263b;
+      background: #131b2d;
+      color: white;
+      font-size: 16px;
+      outline: none;
+      margin: 16px 0;
+    }
+
+    #status {
+      font-size: 14px;
+      color: var(--muted);
+      padding: 10px;
     }
   </style>
 </head>
+
 <body>
-  <header>
-    <h1>Oscars — Nominations (2000–2025)</h1>
-  </header>
-  <main>
-    <aside id="yearList"></aside>
-    <section>
-      <div id="results">Choose a year to load nominations.</div>
-      <div id="status" class="status"></div>
-    </section>
-  </main>
-  <script>
-    const YEAR_START = 2000;
-    const YEAR_END = 2025;
-    const yearListEl = document.getElementById("yearList");
-    const contentEl = document.getElementById("results");
-    const statusEl = document.getElementById("status");
 
-    const CACHE_KEY = "oscars_nominations_cache_v2";
-    let cache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+<header>
+  Oscars — Nominations (2000–2025)
+</header>
 
-    function saveCache() {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-    }
+<main>
+  <!-- LEFT SIDEBAR (Year list) -->
+  <aside id="yearList"></aside>
 
-    // Build year buttons
-    for (let y = YEAR_END; y >= YEAR_START; y--) {
-      const btn = document.createElement("div");
-      btn.className = "year-item";
-      btn.textContent = y;
-      btn.dataset.year = y;
-      btn.addEventListener("click", () => selectYear(y, btn));
-      yearListEl.appendChild(btn);
-    }
-async function selectYear(year, el) {
-      document.querySelectorAll(".year-item")
-        .forEach(x => x.classList.remove("active"));
-      if (el) el.classList.add("active");
+  <!-- MIDDLE (Results) -->
+  <div>
+    <input id="search" placeholder="Filter categories or nominees..." />
+    <div id="status">Select a year.</div>
+    <div id="results"></div>
+  </div>
 
-      statusEl.textContent = `Loading ${year}...`;
-      contentEl.innerHTML = "";
+  <!-- RIGHT INFO BOX -->
+  <aside>
+    Choose a year to load nominations.
+  </aside>
+</main>
 
-      // If cached → show instantly
-      if (cache[year]) {
-        statusEl.textContent = `Loaded from cache — ${year}`;
-        renderData(cache[year]);
-        return;
-      }
+<script>
+/* ------------------ YEAR CONFIG ------------------- */
+const YEAR_START = 2000;
+const YEAR_END = 2025;
 
-      try {
-        const num = year - 1928;  // ceremony number approx.
-        const page = encodeURIComponent(`${num}th_Academy_Awards`);
+const yearListEl = document.getElementById("yearList");
+const resultsEl = document.getElementById("results");
+const statusEl = document.getElementById("status");
+const searchEl = document.getElementById("search");
 
-        const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${page}&prop=text&formatversion=2&origin=*`;
+/* ------------------ YEAR BUTTONS ------------------ */
+for (let y = YEAR_END; y >= YEAR_START; y--) {
+  const div = document.createElement("div");
+  div.className = "year-item";
+  div.textContent = y;
+  div.dataset.year = y;
+  div.onclick = () => selectYear(y, div);
+  yearListEl.appendChild(div);
+}
 
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Network error");
+/* ------------------ SELECT YEAR ------------------- */
+async function selectYear(year, btn) {
+  document.querySelectorAll(".year-item")
+    .forEach(x => x.classList.remove("active"));
+  btn.classList.add("active");
 
-        const json = await res.json();
-        if (json.error) throw new Error(json.error.info || "API error");
+  statusEl.textContent = `Loading ${year}...`;
+  resultsEl.innerHTML = "";
 
-        const html = json.parse.text;
-        const data = extractWinnersAndNominees(html);
+  try {
+    const ceremonyNum = year - 1928;
+    const title = encodeURIComponent(`${ordinal(ceremonyNum)}_Academy_Awards`);
 
-        data._meta = {
-          year,
-          page: `${num}th Academy Awards`,
-          fetchedAt: new Date().toISOString()
-        };
+    const url = `https://en.wikipedia.org/w/api.php?action=parse&format=json&page=${title}&origin=*`;
+    const res = await fetch(url);
+    const json = await res.json();
 
-        cache[year] = data;
-        saveCache();
+    const html = json.parse.text["*"];
+    const data = extractWinners(html);
 
-        statusEl.textContent = `Loaded — ${year}`;
-        renderData(data);
+    statusEl.textContent = `Loaded — ${year}`;
+    render(data);
+  } catch (err) {
+    statusEl.textContent = "Error loading year.";
+    resultsEl.innerHTML = `<pre>${err}</pre>`;
+  }
+}
 
-      } catch (err) {
-        statusEl.textContent = `Error loading ${year}: ${err.message}`;
-        contentEl.innerHTML = `<pre>${err.stack || err.message}</pre>`;
-      }
-    }
+/* ------------------ PARSER ------------------- */
+function extractWinners(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
 
-    // NEW IMPROVED PARSER
-    function extractWinnersAndNominees(html) {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, "text/html");
+  const headline = 
+    doc.querySelector("span.mw-headline[id*='Winners'], h2:contains('Winners')") ||
+    doc.querySelector("span.mw-headline[id*='Nominees'], h2:contains('Nominees')");
 
-      // Try multiple headline patterns because Wikipedia is inconsistent
-      const patterns = [
-        /Winners\s*and\s*nominees/i,
-        /Winners/i,
-        /Nominees/i,
-        /Nominations/i,
-        /Awards/i,
-      ];
+  if (!headline) return { error: "Winners/Nominees section not found." };
 
-      // Gather text headers (h2, h3, h4)
-      const headers = Array.from(
-        doc.querySelectorAll("h2, h3, h4")
-      ).map(h => ({
-        el: h,
-        text: (h.textContent || "").trim()
-      }));
+  const section = headline.closest("h2, h3, h4");
+  const content = [];
+  let next = section.nextElementSibling;
 
-      // Find first matching header
-      let target = null;
-      for (const p of patterns) {
-        target = headers.find(h => p.test(h.text));
-        if (target) break;
-      }
-
-      if (!target) {
-        return { error: "Winners and nominees section not found" };
-      }
-
-      // Section root (after first heading)
-      let node = target.el.nextElementSibling;
-      const categories = [];
-
-      while (node && !/^h[2]$/i.test(node.tagName)) {
-        if (/^h[3]$/i.test(node.tagName)) {
-          const categoryName = node.textContent.trim();
-          const category = { category: categoryName, nominees: [] };
-
-          let li = node.nextElementSibling;
-          while (li && li.tagName.toLowerCase() !== "h3") {
-            if (li.tagName.toLowerCase() === "ul") {
-              Array.from(li.querySelectorAll("li")).forEach(x => {
-                const text = x.textContent.trim();
-                const isWinner = /winner/i.test(text) ||
-                                 x.style.fontWeight === "bold";
-                category.nominees.push({ text, winner: isWinner });
-              });
-            }
-            li = li.nextElementSibling;
-          }
-
-          categories.push(category);
-          node = li;
-          continue;
-        }
-
-        node = node.nextElementSibling;
-      }
-
-      return { categories };
-    }
-
-    function escapeHtml(s) {
-      return s
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
-
-    function renderData(data) {
-      if (data.error) {
-        contentEl.innerHTML = `<div class="small">${data.error}</div>`;
-        return;
-      }
-
-      const q = searchInput.value.trim().toLowerCase();
-      contentEl.innerHTML = "";
-
-      data.categories.forEach(cat => {
-        if (q) {
-          const searchSpace = (cat.category + " " +
-            cat.nominees.map(n => n.text).join(" ")).toLowerCase();
-          if (!searchSpace.includes(q)) return;
-        }
-
-        const wrap = document.createElement("div");
-        wrap.className = "category";
-
-        wrap.innerHTML = `
-          <div class="cat-title">
-            <strong>${escapeHtml(cat.category)}</strong>
-            <span class="small">${cat.nominees.length} nominees</span>
-          </div>
-        `;
-
-        const list = document.createElement("div");
-        list.className = "nominees";
-
-        cat.nominees.forEach(n => {
-          const el = document.createElement("div");
-          el.className = "nominee" + (n.winner ? " winner" : "");
-          el.textContent = n.text;
-          list.appendChild(el);
-        });
-
-        wrap.appendChild(list);
-        contentEl.appendChild(wrap);
+  while (next && !/^H[1-4]$/.test(next.tagName)) {
+    if (next.querySelector("li")) {
+      next.querySelectorAll("li").forEach(li => {
+        content.push(li.textContent.trim());
       });
     }
+    next = next.nextElementSibling;
+  }
 
-    // Load the latest year automatically
-    document.querySelector(".year-item").click();
-  </script>
+  return {
+    categories: [
+      {
+        category: headline.textContent.trim(),
+        nominees: content.map(n => ({ text: n, winner: n.includes("– Winner") }))
+      }
+    ]
+  };
+}
+
+/* ------------------ DISPLAY ------------------- */
+function render(data) {
+  if (data.error) {
+    resultsEl.innerHTML = `<div>${data.error}</div>`;
+    return;
+  }
+  resultsEl.innerHTML = "";
+
+  data.categories.forEach(cat => {
+    const wrap = document.createElement("div");
+    wrap.className = "category";
+
+    wrap.innerHTML = `
+      <div class="cat-title">${cat.category}</div>
+    `;
+
+    cat.nominees.forEach(n => {
+      const d = document.createElement("div");
+      d.className = "nominee" + (n.winner ? " winner" : "");
+      d.textContent = n.text;
+      wrap.appendChild(d);
+    });
+
+    resultsEl.appendChild(wrap);
+  });
+}
+
+/* ------------------ SEARCH FILTER ------------------- */
+searchEl.oninput = () => {
+  const txt = searchEl.value.toLowerCase();
+  const cats = document.querySelectorAll(".category");
+
+  cats.forEach(cat => {
+    const full = cat.textContent.toLowerCase();
+    cat.style.display = full.includes(txt) ? "" : "none";
+  });
+};
+
+/* ------------------ HELPERS ------------------- */
+function ordinal(n) {
+  return (
+    n +
+    (n % 10 == 1 && n % 100 != 11
+      ? "st"
+      : n % 10 == 2 && n % 100 != 12
+      ? "nd"
+      : n % 10 == 3 && n % 100 != 13
+      ? "rd"
+      : "th")
+  );
+}
+
+/* ------------------ AUTO LOAD LATEST YEAR ------------------- */
+setTimeout(() => {
+  document.querySelector(".year-item").click();
+}, 600);
+</script>
 
 </body>
 </html>
+        
