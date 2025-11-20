@@ -147,30 +147,56 @@ for (let y = YEAR_END; y >= YEAR_START; y--) {
 }
 
 /* ------------------ SELECT YEAR ------------------- */
+// Robust selectYear with better error messages and fallback
 async function selectYear(year, btn) {
-  document.querySelectorAll(".year-item")
-    .forEach(x => x.classList.remove("active"));
-  btn.classList.add("active");
+  document.querySelectorAll(".year-item").forEach(x => x.classList.remove("active"));
+  if (btn) btn.classList.add("active");
 
   statusEl.textContent = `Loading ${year}...`;
   resultsEl.innerHTML = "";
 
   try {
     const ceremonyNum = year - 1928;
-    const title = encodeURIComponent(`${ordinal(ceremonyNum)}_Academy_Awards`);
+    const pageTitle = `${ordinal(ceremonyNum)}_Academy_Awards`;
+    const pageEncoded = encodeURIComponent(pageTitle);
 
-    const url = `https://en.wikipedia.org/w/api.php?action=parse&format=json&page=${title}&origin=*`;
-    const res = await fetch(url);
-    const json = await res.json();
+    // Primary URL (explicit JSON)
+    let url = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageEncoded}&prop=text&format=json&formatversion=2&origin=*`;
 
-    const html = json.parse.text["*"];
+    let res = await fetch(url);
+    if (!res.ok) {
+      // Try a second, more permissive URL (older format/version)
+      url = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageEncoded}&prop=text&format=json&origin=*`;
+      res = await fetch(url);
+    }
+
+    // If server returned an HTML page due to redirect or error, show it for debugging
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json") && !ct.includes("text/json")) {
+      // read text so we can show what came back (HTML error page etc.)
+      const txt = await res.text();
+      throw new Error("Server returned non-JSON response. First bytes: " + txt.slice(0, 200));
+    }
+
+    const j = await res.json();
+    if (j.error) throw new Error(j.error.info || JSON.stringify(j.error));
+
+    // parse returned html fragment
+    const html = j.parse && (j.parse.text || j.parse.text['*']) ? (j.parse.text['*'] || j.parse.text) : null;
+    if (!html) throw new Error("No HTML content in API response");
+
     const data = extractWinners(html);
+    data._meta = { year, page: pageTitle, fetchedAt: new Date().toISOString() };
 
+    // show results
     statusEl.textContent = `Loaded — ${year}`;
     render(data);
+
   } catch (err) {
-    statusEl.textContent = "Error loading year.";
-    resultsEl.innerHTML = `<pre>${err}</pre>`;
+    // show more helpful debug info in the UI
+    statusEl.textContent = `Error loading ${year}: ${err.message}`;
+    resultsEl.innerHTML = `<pre style="color:#f88; max-height:60vh; overflow:auto;">${escapeHtml(String(err.stack || err.message))}</pre>`;
+    console.error("selectYear error:", err);
   }
 }
 
