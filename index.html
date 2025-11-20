@@ -121,3 +121,171 @@
       btn.addEventListener("click", () => selectYear(y, btn));
       yearListEl.appendChild(btn);
     }
+async function selectYear(year, el) {
+      document.querySelectorAll(".year-item")
+        .forEach(x => x.classList.remove("active"));
+      if (el) el.classList.add("active");
+
+      statusEl.textContent = `Loading ${year}...`;
+      contentEl.innerHTML = "";
+
+      // If cached → show instantly
+      if (cache[year]) {
+        statusEl.textContent = `Loaded from cache — ${year}`;
+        renderData(cache[year]);
+        return;
+      }
+
+      try {
+        const num = year - 1928;  // ceremony number approx.
+        const page = encodeURIComponent(`${num}th_Academy_Awards`);
+
+        const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${page}&prop=text&formatversion=2&origin=*`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Network error");
+
+        const json = await res.json();
+        if (json.error) throw new Error(json.error.info || "API error");
+
+        const html = json.parse.text;
+        const data = extractWinnersAndNominees(html);
+
+        data._meta = {
+          year,
+          page: `${num}th Academy Awards`,
+          fetchedAt: new Date().toISOString()
+        };
+
+        cache[year] = data;
+        saveCache();
+
+        statusEl.textContent = `Loaded — ${year}`;
+        renderData(data);
+
+      } catch (err) {
+        statusEl.textContent = `Error loading ${year}: ${err.message}`;
+        contentEl.innerHTML = `<pre>${err.stack || err.message}</pre>`;
+      }
+    }
+
+    // NEW IMPROVED PARSER
+    function extractWinnersAndNominees(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+
+      // Try multiple headline patterns because Wikipedia is inconsistent
+      const patterns = [
+        /Winners\s*and\s*nominees/i,
+        /Winners/i,
+        /Nominees/i,
+        /Nominations/i,
+        /Awards/i,
+      ];
+
+      // Gather text headers (h2, h3, h4)
+      const headers = Array.from(
+        doc.querySelectorAll("h2, h3, h4")
+      ).map(h => ({
+        el: h,
+        text: (h.textContent || "").trim()
+      }));
+
+      // Find first matching header
+      let target = null;
+      for (const p of patterns) {
+        target = headers.find(h => p.test(h.text));
+        if (target) break;
+      }
+
+      if (!target) {
+        return { error: "Winners and nominees section not found" };
+      }
+
+      // Section root (after first heading)
+      let node = target.el.nextElementSibling;
+      const categories = [];
+
+      while (node && !/^h[2]$/i.test(node.tagName)) {
+        if (/^h[3]$/i.test(node.tagName)) {
+          const categoryName = node.textContent.trim();
+          const category = { category: categoryName, nominees: [] };
+
+          let li = node.nextElementSibling;
+          while (li && li.tagName.toLowerCase() !== "h3") {
+            if (li.tagName.toLowerCase() === "ul") {
+              Array.from(li.querySelectorAll("li")).forEach(x => {
+                const text = x.textContent.trim();
+                const isWinner = /winner/i.test(text) ||
+                                 x.style.fontWeight === "bold";
+                category.nominees.push({ text, winner: isWinner });
+              });
+            }
+            li = li.nextElementSibling;
+          }
+
+          categories.push(category);
+          node = li;
+          continue;
+        }
+
+        node = node.nextElementSibling;
+      }
+
+      return { categories };
+    }
+
+    function escapeHtml(s) {
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function renderData(data) {
+      if (data.error) {
+        contentEl.innerHTML = `<div class="small">${data.error}</div>`;
+        return;
+      }
+
+      const q = searchInput.value.trim().toLowerCase();
+      contentEl.innerHTML = "";
+
+      data.categories.forEach(cat => {
+        if (q) {
+          const searchSpace = (cat.category + " " +
+            cat.nominees.map(n => n.text).join(" ")).toLowerCase();
+          if (!searchSpace.includes(q)) return;
+        }
+
+        const wrap = document.createElement("div");
+        wrap.className = "category";
+
+        wrap.innerHTML = `
+          <div class="cat-title">
+            <strong>${escapeHtml(cat.category)}</strong>
+            <span class="small">${cat.nominees.length} nominees</span>
+          </div>
+        `;
+
+        const list = document.createElement("div");
+        list.className = "nominees";
+
+        cat.nominees.forEach(n => {
+          const el = document.createElement("div");
+          el.className = "nominee" + (n.winner ? " winner" : "");
+          el.textContent = n.text;
+          list.appendChild(el);
+        });
+
+        wrap.appendChild(list);
+        contentEl.appendChild(wrap);
+      });
+    }
+
+    // Load the latest year automatically
+    document.querySelector(".year-item").click();
+  </script>
+
+</body>
+</html>
