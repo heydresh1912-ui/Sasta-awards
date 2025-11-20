@@ -1,292 +1,362 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Oscars — Nominations (2000–2025)</title>
-
   <style>
-    :root {
-      --bg: #0f172a;
-      --card: #0b1220;
-      --muted: #9aa0b7;
-      --accent: #1e81ff;
-      --radius: 10px;
+    :root{
+      --bg:#071029; --card:#0b1220; --muted:#9aa4b2; --accent:#f59e0b; --radius:10px;
     }
-
-    body {
-      margin: 0;
-      font-family: Inter, Arial, sans-serif;
-      background: var(--bg);
-      color: white;
-    }
-
-    header {
-      padding: 24px;
-      font-size: 24px;
-      border-bottom: 1px solid #1c263b;
-    }
-
-    main {
-      display: grid;
-      grid-template-columns: 250px 1fr 250px;
-      gap: 20px;
-      padding: 20px;
-    }
-
-    aside {
-      background: var(--card);
-      padding: 16px;
-      border-radius: var(--radius);
-      height: calc(100vh - 120px);
-      overflow-y: auto;
-    }
-
-    .year-item {
-      padding: 10px;
-      margin-bottom: 6px;
-      background: #131b2d;
-      border-radius: var(--radius);
-      cursor: pointer;
-    }
-
-    .year-item.active {
-      background: var(--accent);
-    }
-
-    #results {
-      background: var(--card);
-      padding: 16px;
-      border-radius: var(--radius);
-      overflow-y: auto;
-      height: calc(100vh - 120px);
-    }
-
-    .category {
-      margin-bottom: 22px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #1c263b;
-    }
-
-    .cat-title {
-      font-size: 18px;
-      margin-bottom: 10px;
-    }
-
-    .nominee {
-      margin: 4px 0;
-      color: var(--muted);
-    }
-
-    .winner {
-      color: #ffd700;
-      font-weight: bold;
-    }
-
-    #search {
-      width: 100%;
-      padding: 10px 14px;
-      border-radius: var(--radius);
-      border: 1px solid #1c263b;
-      background: #131b2d;
-      color: white;
-      font-size: 16px;
-      outline: none;
-      margin: 16px 0;
-    }
-
-    #status {
-      font-size: 14px;
-      color: var(--muted);
-      padding: 10px;
-    }
+    body{margin:0;font-family:Inter,system-ui,Roboto,Arial;background:linear-gradient(180deg,#071029,#061022);color:#e6eef6}
+    header{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.03)}
+    h1{margin:0;font-size:18px}
+    main{display:grid;grid-template-columns:220px 1fr;gap:18px;padding:18px}
+    aside{background:rgba(255,255,255,0.02);padding:12px;border-radius:12px;height:78vh;overflow:auto}
+    .year-item{padding:8px;border-radius:8px;margin-bottom:6px;cursor:pointer;color:var(--muted)}
+    .year-item.active{background:linear-gradient(90deg,#142534,#0b2536);box-shadow:0 6px 18px rgba(0,0,0,0.6);color:#e6eef6}
+    section.content{background:rgba(255,255,255,0.01);padding:16px;border-radius:12px;min-height:78vh;overflow:auto}
+    .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+    input,select,button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:inherit}
+    button{background:var(--accent);color:#04201b;border:0}
+    .category{margin-bottom:18px;padding-bottom:10px;border-bottom:1px dashed rgba(255,255,255,0.03)}
+    .cat-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .nominee{display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:8px;background:rgba(255,255,255,0.01);margin-bottom:8px}
+    .nominee img{width:64px;height:90px;object-fit:cover;border-radius:6px;flex-shrink:0}
+    .nom-text{font-size:14px}
+    .winner{background:linear-gradient(90deg,rgba(245,158,11,0.06),rgba(245,158,11,0.02));border:1px solid rgba(245,158,11,0.08)}
+    .small{font-size:13px;color:var(--muted)}
+    pre{white-space:pre-wrap;color:#f88}
+    footer{padding:10px;text-align:center;color:var(--muted);font-size:13px}
   </style>
 </head>
-
 <body>
+  <header>
+    <div>
+      <h1>Oscars — Nominations (2000–2025)</h1>
+      <div class="small">Loads local data if available, otherwise fetches Wikipedia (fallback).</div>
+    </div>
+    <div class="controls">
+      <input id="search" placeholder="Filter categories or nominees..." />
+      <button id="exportJson">Export JSON</button>
+    </div>
+  </header>
 
-<header>
-  Oscars — Nominations (2000–2025)
-</header>
+  <main>
+    <aside>
+      <div class="small" style="margin-bottom:8px">Select ceremony year</div>
+      <div id="yearList" class="year-list"></div>
+      <div class="small" style="margin-top:12px">Tip: run the data fetch workflow to create local JSON for best reliability.</div>
+    </aside>
 
-<main>
-  <!-- LEFT SIDEBAR (Year list) -->
-  <aside id="yearList"></aside>
+    <section class="content" id="content">
+      <div id="status" class="small">Choose a year to load nominations.</div>
+      <div id="results"></div>
+    </section>
+  </main>
 
-  <!-- MIDDLE (Results) -->
-  <div>
-    <input id="search" placeholder="Filter categories or nominees..." />
-    <div id="status">Select a year.</div>
-    <div id="results"></div>
-  </div>
-
-  <!-- RIGHT INFO BOX -->
-  <aside>
-    Choose a year to load nominations.
-  </aside>
-</main>
+  <footer>Built with ❤️ — data: Wikipedia; fallbacks used to avoid CORS issues.</footer>
 
 <script>
-/* ------------------ YEAR CONFIG ------------------- */
-const YEAR_START = 2000;
-const YEAR_END = 2025;
+/* ---------- Config ---------- */
+const YEAR_START = 2000, YEAR_END = 2025;
+const yearListEl = document.getElementById('yearList');
+const resultsEl = document.getElementById('results');
+const statusEl = document.getElementById('status');
+const searchInput = document.getElementById('search');
+const CACHE_KEY = 'oscars_nominations_cache_v2';
+let cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+function saveCache(){ localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); }
 
-const yearListEl = document.getElementById("yearList");
-const resultsEl = document.getElementById("results");
-const statusEl = document.getElementById("status");
-const searchEl = document.getElementById("search");
-
-/* ------------------ YEAR BUTTONS ------------------ */
-for (let y = YEAR_END; y >= YEAR_START; y--) {
-  const div = document.createElement("div");
-  div.className = "year-item";
-  div.textContent = y;
-  div.dataset.year = y;
-  div.onclick = () => selectYear(y, div);
-  yearListEl.appendChild(div);
+/* ---------- UI: year buttons ---------- */
+for(let y=YEAR_END;y>=YEAR_START;y--){
+  const d = document.createElement('div');
+  d.className='year-item';
+  d.textContent = y;
+  d.dataset.year = y;
+  d.addEventListener('click', ()=>selectYear(y, d));
+  yearListEl.appendChild(d);
 }
 
-// selectYear using AllOrigins proxy to avoid CORS/HTML error
-./data/{year}.json). {
-  document.querySelectorAll(".year-item").forEach(x => x.classList.remove("active"));
-  if (btn) btn.classList.add("active");
+/* ---------- Helper: escape ---------- */
+function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
 
-  statusEl.textContent = `Loading ${year}...`;
-  resultsEl.innerHTML = "";
+/* ---------- Robust parser for Wikipedia HTML fragments ---------- */
+function extractWinnersAndNomineesFromHtml(html){
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
 
-  try {
+  // gather headings and mw-headline spans
+  const headings = Array.from(doc.querySelectorAll('h1,h2,h3,h4,span.mw-headline')).map(h=>{
+    return { el:h, text:(h.textContent||'').replace(/\[\d+\]/g,'').trim() };
+  });
+
+  const patterns = [
+    /\bWinners\s*and\s*nominees\b/i,
+    /\bWinners\b/i,
+    /\bNominees\b/i,
+    /\bNominations\b/i,
+    /\bAwards\b/i
+  ];
+
+  let target = null;
+  for(const p of patterns){
+    target = headings.find(h => p.test(h.text));
+    if(target) break;
+  }
+  if(!target){
+    // fallback: pick first h2/h3 that has lists after it
+    const allHeaders = Array.from(doc.querySelectorAll('h2,h3,h4'));
+    target = allHeaders.find(h=>{
+      let n = h.nextElementSibling;
+      while(n && /^(div|p|ul|table)$/i.test(n.tagName)) {
+        if(n.querySelector && n.querySelector('li')) return true;
+        n = n.nextElementSibling;
+      }
+      return false;
+    });
+    if(!target) return { error: 'Winners and nominees section not found on page' };
+    target = { el: target, text: target.textContent.trim() };
+  }
+
+  // find section root
+  let sectionRoot = target.el.closest('h2,h3,h4') || target.el;
+  const result = { categories: [] };
+  let node = sectionRoot.nextElementSibling;
+  while(node && node.tagName && node.tagName.toLowerCase()!=='h2'){
+    const tag = node.tagName.toLowerCase();
+    if(tag==='h3' || tag==='h4'){
+      const catName = node.textContent.trim();
+      const cat = { category: catName, nominees: [] };
+      let n2 = node.nextElementSibling;
+      while(n2 && !/^h[1-4]$/i.test(n2.tagName)){
+        const t2 = n2.tagName.toLowerCase();
+        if(t2==='ul'){
+          Array.from(n2.querySelectorAll('li')).forEach(li=>{
+            const text = li.textContent.replace(/\[\d+\]/g,'').trim();
+            const anchor = li.querySelector('a');
+            const title = anchor ? (anchor.getAttribute('title') || anchor.textContent) : null;
+            const isWinner = /\(Winner\)|\bWinner\b|\bwon\b/i.test(li.innerHTML) || li.classList.contains('winner');
+            cat.nominees.push({ text, winner: !!isWinner, title });
+          });
+        } else if(t2==='table'){
+          Array.from(n2.querySelectorAll('tr')).forEach(tr=>{
+            const cols = Array.from(tr.querySelectorAll('td,th')).map(c=>c.textContent.trim()).filter(Boolean);
+            if(cols.length){
+              const text = cols.join(' — ');
+              const isWinner = /winner/i.test(tr.textContent) || tr.querySelector('.winner')!=null;
+              const a = tr.querySelector('a');
+              const title = a ? (a.getAttribute('title')||a.textContent) : null;
+              cat.nominees.push({ text, winner: !!isWinner, title });
+            }
+          });
+        } else if(t2==='p'){
+          const lines = n2.textContent.split('\n').map(s=>s.trim()).filter(Boolean);
+          lines.forEach(L=>{
+            if(L.length>20){
+              const isWinner = /\(Winner\)/i.test(L);
+              cat.nominees.push({ text: L, winner: isWinner, title: null });
+            }
+          });
+        }
+        n2 = n2.nextElementSibling;
+      }
+      if(cat.nominees.length) result.categories.push(cat);
+      node = n2;
+      continue;
+    }
+
+    if(tag==='ul'){
+      // sometimes categories are inline; create a generic category
+      const cat = { category: sectionRoot.textContent.trim()||'Nominees', nominees: [] };
+      Array.from(node.querySelectorAll('li')).forEach(li=>{
+        const text = li.textContent.replace(/\[\d+\]/g,'').trim();
+        const anchor = li.querySelector('a');
+        const title = anchor ? (anchor.getAttribute('title')||anchor.textContent) : null;
+        const isWinner = /\(Winner\)|\bWinner\b|\bwon\b/i.test(li.innerHTML) || li.classList.contains('winner');
+        cat.nominees.push({ text, winner:isWinner, title });
+      });
+      if(cat.nominees.length) result.categories.push(cat);
+      node = node.nextElementSibling;
+      continue;
+    }
+
+    if(tag==='table'){
+      const cat = { category: sectionRoot.textContent.trim()||'Nominees', nominees: [] };
+      Array.from(node.querySelectorAll('tr')).forEach(tr=>{
+        const cols = Array.from(tr.querySelectorAll('td,th')).map(c=>c.textContent.trim()).filter(Boolean);
+        if(cols.length){
+          const text = cols.join(' — ');
+          const isWinner = /winner/i.test(tr.textContent);
+          const a = tr.querySelector('a');
+          const title = a ? (a.getAttribute('title')||a.textContent) : null;
+          cat.nominees.push({ text, winner:isWinner, title });
+        }
+      });
+      if(cat.nominees.length) result.categories.push(cat);
+      node = node.nextElementSibling;
+      continue;
+    }
+
+    node = node.nextElementSibling;
+  }
+
+  result.categories = result.categories.filter(c=>c.nominees && c.nominees.length);
+  if(!result.categories.length) return { error:'No nominees found in detected section' };
+  return result;
+}
+
+/* ---------- Helper: fetch Wikipedia summary for thumbnail ---------- */
+async function fetchWikiSummary(title){
+  // REST summary endpoint returns thumbnail if available
+  try{
+    const url = 'https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title);
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const j = await res.json();
+    return { thumbnail: j.thumbnail?.source || null, extract: j.extract || '' };
+  }catch(e){ return null; }
+}
+
+/* ---------- selectYear: tries local JSON first, then Wikipedia via proxy ---------- */
+async function selectYear(year, el){
+  document.querySelectorAll('.year-item').forEach(x=>x.classList.remove('active'));
+  if(el) el.classList.add('active');
+
+  statusEl.textContent = `Loading nominations for ${year}...`;
+  resultsEl.innerHTML = '';
+
+  // 1) try local data ./data/{year}.json
+  try{
+    const localUrl = `./data/${year}.json`;
+    const r = await fetch(localUrl);
+    if(r.ok){
+      const data = await r.json();
+      // if the JSON was created by the workflow, it should have categories and thumbnails
+      cache[year] = data;
+      saveCache();
+      statusEl.textContent = `Loaded from local data — ${year}`;
+      renderData(data);
+      return;
+    }
+    // fallthrough to wiki
+  }catch(e){
+    // continue to fallback fetch
+  }
+
+  // 2) fallback: fetch Wikipedia parse API through CORS proxy (AllOrigins)
+  try{
     const ceremonyNum = year - 1928;
-    const pageTitle = `${ordinal(ceremonyNum)}_Academy_Awards`;
-    // Build the MediaWiki API URL (we will pass it to the CORS proxy)
-    const apiUrl = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageTitle)}&prop=text&format=json&formatversion=2`;
-
-    // AllOrigins proxy (returns the raw response and adds CORS headers)
-    const proxy = "https://api.allorigins.win/raw?url=";
+    const pageTitle = encodeURIComponent(ordinal(ceremonyNum) + '_Academy_Awards');
+    const apiUrl = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageTitle}&prop=text&format=json&formatversion=2`;
+    const proxy = 'https://api.allorigins.win/raw?url=';
     const proxied = proxy + encodeURIComponent(apiUrl);
 
     const res = await fetch(proxied);
-    if (!res.ok) throw new Error("Network error from proxy");
+    if(!res.ok) throw new Error('Network error from proxy');
 
-    // The proxy returns the *raw* JSON string from MediaWiki (or an HTML error)
     const text = await res.text();
-
-    // Try to parse JSON safely; if it's HTML or invalid JSON we'll show it
     let j;
-    try {
-      j = JSON.parse(text);
-    } catch (e) {
-      throw new Error("Server returned non-JSON response (first chars): " + text.slice(0,200));
-    }
-
-    if (j.error) throw new Error(j.error.info || JSON.stringify(j.error));
+    try{ j = JSON.parse(text); } catch(err){ throw new Error('Non-JSON response from proxy: '+ text.slice(0,200)); }
 
     const html = j.parse && (j.parse.text || j.parse.text['*']) ? (j.parse.text['*'] || j.parse.text) : null;
-    if (!html) throw new Error("No HTML content returned from API");
+    if(!html) throw new Error('No HTML returned from Wikipedia');
 
-    const data = extractWinners(html);
-    data._meta = { year, page: pageTitle, fetchedAt: new Date().toISOString() };
+    // parse
+    const parsed = extractWinnersAndNomineesFromHtml(html);
 
-    // render
-    statusEl.textContent = `Loaded — ${year}`;
-    render(data);
-
-  } catch (err) {
-    statusEl.textContent = `Error loading ${year}: ${err.message}`;
-    resultsEl.innerHTML = `<pre style="color:#f88">${escapeHtml(String(err.message))}</pre>`;
-    console.error(err);
-  }
-}
-function extractWinners(html) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-
-  const headline = 
-    doc.querySelector("span.mw-headline[id*='Winners'], h2:contains('Winners')") ||
-    doc.querySelector("span.mw-headline[id*='Nominees'], h2:contains('Nominees')");
-
-  if (!headline) return { error: "Winners/Nominees section not found." };
-
-  const section = headline.closest("h2, h3, h4");
-  const content = [];
-  let next = section.nextElementSibling;
-
-  while (next && !/^H[1-4]$/.test(next.tagName)) {
-    if (next.querySelector("li")) {
-      next.querySelectorAll("li").forEach(li => {
-        content.push(li.textContent.trim());
-      });
-    }
-    next = next.nextElementSibling;
-  }
-
-  return {
-    categories: [
-      {
-        category: headline.textContent.trim(),
-        nominees: content.map(n => ({ text: n, winner: n.includes("– Winner") }))
+    // enhance with thumbnails where possible
+    for(const cat of parsed.categories || []){
+      for(const nom of cat.nominees){
+        if(nom.title){
+          const s = await fetchWikiSummary(nom.title);
+          nom.thumbnail = s ? s.thumbnail : null;
+          nom.wikiExtract = s ? s.extract : '';
+          await new Promise(r=>setTimeout(r,120)); // be polite
+        } else {
+          nom.thumbnail = null;
+          nom.wikiExtract = '';
+        }
       }
-    ]
-  };
+    }
+
+    const data = { _meta:{year, fetchedAt:new Date().toISOString()}, categories: parsed.categories || [] };
+    cache[year] = data; saveCache();
+    statusEl.textContent = `Loaded from Wikipedia (proxy) — ${year}`;
+    renderData(data);
+    return;
+
+  }catch(err){
+    statusEl.textContent = `Error loading ${year}: ${err.message}`;
+    resultsEl.innerHTML = `<pre>${escapeHtml(String(err.stack || err.message))}</pre>`;
+  }
 }
 
-/* ------------------ DISPLAY ------------------- */
-function render(data) {
-  if (data.error) {
-    resultsEl.innerHTML = `<div>${data.error}</div>`;
+/* ---------- Render data ---------- */
+function renderData(data){
+  if(!data || data.error){
+    resultsEl.innerHTML = `<div class="small">${escapeHtml(data?.error || 'No data')}</div>`;
     return;
   }
-  resultsEl.innerHTML = "";
+  const q = searchInput.value.trim().toLowerCase();
+  resultsEl.innerHTML = '';
+  data.categories.forEach(cat=>{
+    // filter by search
+    if(q){
+      const hay = (cat.category + ' ' + cat.nominees.map(n=>n.text).join(' ')).toLowerCase();
+      if(!hay.includes(q)) return;
+    }
+    const wrap = document.createElement('div'); wrap.className='category';
+    const title = document.createElement('div'); title.className='cat-title';
+    title.innerHTML = `<strong>${escapeHtml(cat.category)}</strong><span class="small">${cat.nominees.length} nominees</span>`;
+    wrap.appendChild(title);
 
-  data.categories.forEach(cat => {
-    const wrap = document.createElement("div");
-    wrap.className = "category";
-
-    wrap.innerHTML = `
-      <div class="cat-title">${cat.category}</div>
-    `;
-
-    cat.nominees.forEach(n => {
-      const d = document.createElement("div");
-      d.className = "nominee" + (n.winner ? " winner" : "");
-      d.textContent = n.text;
-      wrap.appendChild(d);
+    cat.nominees.forEach(n=>{
+      const nm = document.createElement('div'); nm.className='nominee' + (n.winner ? ' winner' : '');
+      if(n.thumbnail){
+        const img = document.createElement('img'); img.src = n.thumbnail; img.alt = n.text || '';
+        img.loading='lazy';
+        nm.appendChild(img);
+      }
+      const txt = document.createElement('div'); txt.className='nom-text';
+      const titleText = n.text || (n.title || '');
+      txt.innerHTML = `<div>${escapeHtml(titleText)}</div>${n.wikiExtract ? `<div class="small">${escapeHtml(n.wikiExtract).slice(0,200)}…</div>` : ''}`;
+      nm.appendChild(txt);
+      wrap.appendChild(nm);
     });
 
     resultsEl.appendChild(wrap);
   });
+
+  if(resultsEl.children.length===0) resultsEl.innerHTML = '<div class="small">No categories matched your search.</div>';
 }
 
-/* ------------------ SEARCH FILTER ------------------- */
-searchEl.oninput = () => {
-  const txt = searchEl.value.toLowerCase();
-  const cats = document.querySelectorAll(".category");
+/* ---------- Export JSON ---------- */
+document.getElementById('exportJson').addEventListener('click', ()=>{
+  const active = document.querySelector('.year-item.active');
+  if(!active) return alert('Select a year first');
+  const y = active.dataset.year;
+  const data = cache[y];
+  if(!data) return alert('No data loaded for this year');
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `oscars_${y}.json`; document.body.appendChild(a); a.click(); a.remove();
+});
 
-  cats.forEach(cat => {
-    const full = cat.textContent.toLowerCase();
-    cat.style.display = full.includes(txt) ? "" : "none";
-  });
-};
+/* ---------- Search ---------- */
+searchInput.addEventListener('input', ()=>{
+  const active = document.querySelector('.year-item.active');
+  if(active){ renderData(cache[active.dataset.year]); }
+});
 
-/* ------------------ HELPERS ------------------- */
-function ordinal(n) {
-  return (
-    n +
-    (n % 10 == 1 && n % 100 != 11
-      ? "st"
-      : n % 10 == 2 && n % 100 != 12
-      ? "nd"
-      : n % 10 == 3 && n % 100 != 13
-      ? "rd"
-      : "th")
-  );
+/* ---------- Utilities ---------- */
+function ordinal(n){
+  const s=['th','st','nd','rd'], v=n%100;
+  return n + (s[(v-20)%10]||s[v]||s[0]);
 }
 
-/* ------------------ AUTO LOAD LATEST YEAR ------------------- */
-setTimeout(() => {
-  document.querySelector(".year-item").click();
-}, 600);
+/* ---------- Auto select latest ---------- */
+const first = document.querySelector('.year-item');
+if(first) first.click();
 </script>
-
 </body>
 </html>
-        
