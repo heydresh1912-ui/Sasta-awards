@@ -63,15 +63,7 @@
   </footer>
 
 <script>
-    
-      
-    document.querySelector('.year-item').click();
-  </script>
-
-</body>
-</html>
-
-function extractWinnersAndNominees(html){
+ function extractWinnersAndNominees(html){
   // More tolerant parser: look for several possible headings and gather nearby lists/tables/paragraphs
   const parser = new DOMParser();
   const doc = parser.parseFromString(html,'text/html');
@@ -206,4 +198,13 @@ function extractWinnersAndNominees(html){
     return {error:'No nominees found in the detected section'};
   }
   return result;
-}
+ }   
+      
+    document.querySelector('.year-item').click();
+  </script>
+
+
+</body>
+</html>
+
+        
