@@ -92,37 +92,100 @@
     function saveCache(){ localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); }
 
     async function selectYear(year, el){
-    document.querySelectorAll('.year-item').forEach(x=>x.classList.remove('active'));
-    if(el) el.classList.add('active');
-    statusEl.textContent = `Loading nominations for ${year}...`;
-    contentEl.innerHTML='';
+// Helper: ask MediaWiki which sections the page has and return the section index that matches winners/nominees
+async function findWinnersSectionIndex(pageEncoded){
+  try{
+    const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageEncoded}&prop=sections&format=json&origin=*`;
+    const r = await fetch(url);
+    if(!r.ok) return null;
+    const j = await r.json();
+    if(!j.parse || !Array.isArray(j.parse.sections)) return null;
 
-      if(cache[year]){
-        statusEl.textContent = `Loaded from cache — ${year}`;
-        renderData(cache[year]);
-        return;
-      }
+    const patterns = [
+      /\bWinners\s*and\s*nominees\b/i,
+      /\bWinners\b/i,
+      /\bNominees\b/i,
+      /\bNominations\b/i,
+      /\bAwards\b/i
+    ];
 
-      try{
-        const num = ceremonyNumberFromYear(year);
-        const page = encodeURIComponent(ordinal(num) + '_Academy_Awards');
-        const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${page}&prop=text&format=json&origin=*`;
-        const res = await fetch(url);
-        if(!res.ok) throw new Error('Network error');
-        const json = await res.json();
-        if(json.error) throw new Error(json.error.info || 'API error');
-        const html = json.parse.text['*'];
-        const data = extractWinnersAndNominees(html);
-        data._meta = {year, page:`${ordinal(num)} Academy Awards`, fetchedAt: new Date().toISOString() };
-        cache[year] = data;
-        saveCache();
-        statusEl.textContent = `Loaded — ${year}`;
-        renderData(data);
-      }catch(err){
-        statusEl.textContent = `Error loading ${year}: ${err.message}`;
-        contentEl.innerHTML = `<pre>${err.stack||err.message}</pre>`;
+    for(const sec of j.parse.sections){
+      const title = (sec.line || '').trim();
+      for(const p of patterns){
+        if(p.test(title)) return sec.index || null;
       }
     }
+
+    return null;
+  }catch(e){
+    return null;
+  }
+}
+
+// NEW selectYear — replaces the old broken one
+async function selectYear(year, el){
+  // highlight selected button
+  document.querySelectorAll('.year-item').forEach(x=>x.classList.remove('active'));
+  if(el) el.classList.add('active');
+
+  statusEl.textContent = `Loading nominations for ${year}...`;
+  contentEl.innerHTML = '';
+
+  // check cache
+  if(cache[year]){
+    statusEl.textContent = `Loaded from cache — ${year}`;
+    renderData(cache[year]);
+    return;
+  }
+
+  try{
+    // Wikipedia page name
+    const num = ceremonyNumberFromYear(year);
+    const pageName = `${ordinal(num)}_Academy_Awards`;
+    const pageEncoded = encodeURIComponent(pageName);
+
+    // STEP 1 — ask Wikipedia which sections exist
+    const sectionIndex = await findWinnersSectionIndex(pageEncoded);
+
+    let html = null;
+
+    if(sectionIndex){
+      // fetch only the winners/nominees section
+      const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageEncoded}&prop=text&section=${sectionIndex}&format=json&origin=*`;
+      const res = await fetch(url);
+      const j = await res.json();
+      html = j.parse?.text?.['*'] || null;
+    } else {
+      // fallback — fetch whole page
+      const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageEncoded}&prop=text&format=json&origin=*`;
+      const res = await fetch(url);
+      const j = await res.json();
+      html = j.parse?.text?.['*'] || null;
+    }
+
+    if(!html) throw new Error("No data returned from Wikipedia");
+
+    // Parse winners + nominees
+    const data = extractWinnersAndNominees(html);
+    data._meta = {
+      year,
+      page: pageName,
+      fetchedAt: new Date().toISOString(),
+      sectionIndex
+    };
+
+    // save cache
+    cache[year] = data;
+    saveCache();
+
+    statusEl.textContent = `Loaded — ${year}`;
+    renderData(data);
+
+  }catch(err){
+    statusEl.textContent = `Error loading ${year}: ${err.message}`;
+    contentEl.innerHTML = `<pre>${err.stack || err.message}</pre>`;
+  }
+}
         // Robust parser placed inside the script block
     function extractWinnersAndNominees(html){
       const parser = new DOMParser();
