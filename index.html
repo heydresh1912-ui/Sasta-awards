@@ -249,7 +249,8 @@ async function selectYear(year, el){
     const ceremonyNum = year - 1928;
     const pageTitle = encodeURIComponent(ordinal(ceremonyNum) + '_Academy_Awards');
     const apiUrl = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageTitle}&prop=text&format=json&formatversion=2`;
-    const proxy = 'https://api.allorigins.win/raw?url=';
+    // alternative proxy if AllOrigins is down
+const proxy = 'https://thingproxy.freeboard.io/fetch/';
     const proxied = proxy + encodeURIComponent(apiUrl);
 
     const res = await fetch(proxied);
