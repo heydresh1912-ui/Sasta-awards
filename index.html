@@ -92,10 +92,10 @@
     function saveCache(){ localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); }
 
     async function selectYear(year, el){
-      document.querySelectorAll('.year-item').forEach(x=>x.classList.remove('active'));
-      el.classList.add('active');
-      statusEl.textContent = `Loading nominations for ${year}...`;
-      contentEl.innerHTML='';
+    document.querySelectorAll('.year-item').forEach(x=>x.classList.remove('active'));
+    if(el) el.classList.add('active');
+    statusEl.textContent = `Loading nominations for ${year}...`;
+    contentEl.innerHTML='';
 
       if(cache[year]){
         statusEl.textContent = `Loaded from cache — ${year}`;
