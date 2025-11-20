@@ -63,164 +63,147 @@
   </footer>
 
 <script>
-    function ordinal(n){
-      const s=["th","st","nd","rd"], v=n%100;
-      return n + (s[(v-20)%10]||s[v]||s[0]);
-    }
-
-    function ceremonyNumberFromYear(year){ return year - 1928; }
-
-    const YEAR_START = 2000, YEAR_END = 2025;
-    const yearListEl = document.getElementById('yearList');
-    const contentEl = document.getElementById('results');
-    const statusEl = document.getElementById('status');
-    const searchInput = document.getElementById('search');
-
-    for(let y=YEAR_END;y>=YEAR_START;y--){
-      const btn = document.createElement('div');
-      btn.className='year-item';
-      btn.textContent = y;
-      btn.dataset.year = y;
-      btn.addEventListener('click', ()=>selectYear(y, btn));
-      yearListEl.appendChild(btn);
-    }
-
-    const CACHE_KEY = 'oscars_nominations_cache_v1';
-    let cache = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');
-
-    function saveCache(){ localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); }
-
-    async function selectYear(year, el){
-      document.querySelectorAll('.year-item').forEach(x=>x.classList.remove('active'));
-      el.classList.add('active');
-      statusEl.textContent = `Loading nominations for ${year}...`;
-      contentEl.innerHTML='';
-
-      if(cache[year]){
-        statusEl.textContent = `Loaded from cache — ${year}`;
-        renderData(cache[year]);
-        return;
-      }
-
-      try{
-        const num = ceremonyNumberFromYear(year);
-        const page = encodeURIComponent(ordinal(num) + '_Academy_Awards');
-        const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${page}&prop=text&format=json&origin=*`;
-
-        const res = await fetch(url);
-        if(!res.ok) throw new Error('Network error');
-
-        const json = await res.json();
-        if(json.error) throw new Error(json.error.info || 'API error');
-
-        const html = json.parse.text['*'];
-        const data = extractWinnersAndNominees(html);
-
-        data._meta = {
-          year,
-          page:`${ordinal(num)} Academy Awards`,
-          fetchedAt: new Date().toISOString()
-        };
-
-        cache[year] = data;
-        saveCache();
-        statusEl.textContent = `Loaded — ${year}`;
-        renderData(data);
-
-      } catch(err){
-        statusEl.textContent = `Error loading ${year}: ${err.message}`;
-        contentEl.innerHTML = `<pre>${err.stack||err.message}</pre>`;
-      }
-    }
-
-    function extractWinnersAndNominees(html){
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html,'text/html');
-      const headlines = Array.from(doc.querySelectorAll('span.mw-headline'));
-      const target = headlines.find(h => /Winners\s*and\s*nominees/i.test(h.textContent));
-
-      if(!target)
-        return {error:'Winners and nominees section not found on page'};
-
-      let sectionRoot = target.closest('h2') || target.closest('h3');
-      const result = {categories:[]};
-      let node = sectionRoot.nextElementSibling;
-
-      while(node && node.tagName.toLowerCase()!=='h2'){
-        if(node.tagName.toLowerCase()==='h3'){
-          const catName = node.textContent.trim();
-          const cat = {category:catName, nominees:[]};
-
-          let n2 = node.nextElementSibling;
-          while(n2 && !/^h[1-4]$/.test(n2.tagName.toLowerCase())){
-            if(n2.tagName.toLowerCase()==='ul'){
-              Array.from(n2.querySelectorAll('li')).forEach(li=>{
-                const text = li.textContent.trim();
-                const isWinner = /\bWinner\b|\bwon\b/i.test(text);
-                cat.nominees.push({text, winner:isWinner});
-              });
-            }
-            n2 = n2.nextElementSibling;
-          }
-
-          result.categories.push(cat);
-          node = n2;
-          continue;
-        }
-        node = node.nextElementSibling;
-      }
-
-      return result;
-    }
-
-    function escapeHtml(s){
-      return s.replace(/&/g,'&amp;')
-              .replace(/</g,'&lt;')
-              .replace(/>/g,'&gt;');
-    }
-
-    function renderData(data){
-      if(data.error){
-        contentEl.innerHTML = `<div class="small">${data.error}</div>`;
-        return;
-      }
-
-      const q = searchInput.value.trim().toLowerCase();
-      contentEl.innerHTML = '';
-
-      data.categories.forEach(cat=>{
-        if(q){
-          const searchSpace = (cat.category + ' ' + cat.nominees.map(n=>n.text).join(' ')).toLowerCase();
-          if(!searchSpace.includes(q)) return;
-        }
-
-        const wrap = document.createElement('div');
-        wrap.className='category';
-
-        wrap.innerHTML = `
-          <div class="cat-title">
-            <strong>${escapeHtml(cat.category)}</strong>
-            <span class="small">${cat.nominees.length} nominees</span>
-          </div>
-        `;
-
-        const list = document.createElement('div');
-        list.className='nominees';
-
-        cat.nominees.forEach(n=>{
-          const el = document.createElement('div');
-          el.className='nominee' + (n.winner ? ' winner' : '');
-          el.innerHTML = escapeHtml(n.text);
-          list.appendChild(el);
-        });
-
-        wrap.appendChild(list);
-        contentEl.appendChild(wrap);
-      });
-    }
-
+    
+      
     document.querySelector('.year-item').click();
   </script>
 
 </body>
 </html>
+
+function extractWinnersAndNominees(html){
+  // More tolerant parser: look for several possible headings and gather nearby lists/tables/paragraphs
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html,'text/html');
+
+  // candidate headline text patterns (order matters — common ones first)
+  const headlinePatterns = [
+    /\bWinners\s*and\s*nominees\b/i,
+    /\bWinners\b/i,
+    /\bNominees\b/i,
+    /\bNominations\b/i,
+    /\bWinners\s*and\s*Nominees/i,
+    /\bAwards\b/i
+  ];
+
+  // gather all mw-headline spans and plain headings to search
+  const headlines = Array.from(doc.querySelectorAll('span.mw-headline, h2, h3, h4')).map(h=>{
+    return {el: h, text: (h.textContent||'').trim()};
+  });
+
+  // find the first matching headline by any pattern
+  let targetEntry = null;
+  for(const p of headlinePatterns){
+    targetEntry = headlines.find(h => p.test(h.text));
+    if(targetEntry) break;
+  }
+
+  // fallback: if not found, try headings that contain 'nominee' or 'winner' words
+  if(!targetEntry){
+    targetEntry = headlines.find(h => /\b(nominee|winner|selection)\b/i.test(h.text));
+  }
+
+  // final fallback: use the first large section that contains ULs or tables
+  if(!targetEntry){
+    const bigSection = doc.querySelector('h2, h3, h4');
+    if(bigSection){
+      targetEntry = {el: bigSection, text: bigSection.textContent.trim()};
+    }
+  }
+
+  if(!targetEntry) return {error:'Winners and nominees section not found on page'};
+
+  // find the actual heading element (if span, get its closest heading parent)
+  let sectionRoot = targetEntry.el.closest('h2, h3, h4') || targetEntry.el;
+
+  const result = {categories:[]};
+
+  // walk siblings until next h2 (or end)
+  let node = sectionRoot.nextElementSibling;
+  while(node && node.tagName && node.tagName.toLowerCase()!=='h2'){
+    const tag = node.tagName.toLowerCase();
+
+    // treat h3/h4 as category titles
+    if(tag==='h3' || tag==='h4'){
+      const catName = node.textContent.trim();
+      const cat = {category:catName, nominees:[]};
+
+      // collect following nodes (ul, table, p) until next heading of same/higher level
+      let n2 = node.nextElementSibling;
+      while(n2 && !/^h[1-4]$/.test(n2.tagName.toLowerCase())){
+        const t2 = n2.tagName.toLowerCase();
+
+        if(t2==='ul'){
+          Array.from(n2.querySelectorAll('li')).forEach(li=>{
+            const text = li.textContent.trim();
+            const isWinner = /\(Winner\)|\bWinner\b|\bwon\b/i.test(li.innerHTML) || li.querySelector('.winner')!=null;
+            if(text) cat.nominees.push({text, winner:isWinner});
+          });
+        } else if(t2==='table'){
+          Array.from(n2.querySelectorAll('tr')).forEach(tr=>{
+            const cols = Array.from(tr.querySelectorAll('td,th')).map(c=>c.textContent.trim()).filter(Boolean);
+            if(cols.length){
+              const text = cols.join(' — ');
+              const isWinner = /winner/i.test(tr.textContent) || tr.querySelector('.winner')!=null;
+              cat.nominees.push({text, winner:isWinner});
+            }
+          });
+        } else if(t2==='p'){
+          // paragraphs sometimes contain inline lists
+          const lines = n2.textContent.split('\n').map(s=>s.trim()).filter(Boolean);
+          lines.forEach(L=>{
+            if(L.length>20){
+              const isWinner = /\(Winner\)|\bWinner\b/i.test(L);
+              cat.nominees.push({text:L, winner:isWinner});
+            }
+          });
+        }
+        n2 = n2.nextElementSibling;
+      }
+
+      result.categories.push(cat);
+      node = n2;
+      continue;
+    }
+
+    // if we hit a UL directly under the main section (some pages use direct lists)
+    if(tag==='ul'){
+      // create a generic category if none yet
+      const cat = {category: sectionRoot.textContent.trim() || 'Nominees', nominees:[]};
+      Array.from(node.querySelectorAll('li')).forEach(li=>{
+        const text = li.textContent.trim();
+        const isWinner = /\(Winner\)|\bWinner\b|\bwon\b/i.test(li.innerHTML) || li.querySelector('.winner')!=null;
+        if(text) cat.nominees.push({text, winner:isWinner});
+      });
+      result.categories.push(cat);
+      node = node.nextElementSibling;
+      continue;
+    }
+
+    // if we see a table directly, treat similarly
+    if(tag==='table'){
+      const cat = {category: sectionRoot.textContent.trim() || 'Nominees', nominees:[]};
+      Array.from(node.querySelectorAll('tr')).forEach(tr=>{
+        const cols = Array.from(tr.querySelectorAll('td,th')).map(c=>c.textContent.trim()).filter(Boolean);
+        if(cols.length){
+          const text = cols.join(' — ');
+          const isWinner = /winner/i.test(tr.textContent) || tr.querySelector('.winner')!=null;
+          cat.nominees.push({text, winner:isWinner});
+        }
+      });
+      result.categories.push(cat);
+      node = node.nextElementSibling;
+      continue;
+    }
+
+    node = node.nextElementSibling;
+  }
+
+  // Clean up: remove empty categories
+  result.categories = result.categories.filter(c => c.nominees && c.nominees.length);
+
+  if(!result.categories.length){
+    return {error:'No nominees found in the detected section'};
+  }
+  return result;
+}
